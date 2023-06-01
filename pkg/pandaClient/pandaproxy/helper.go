@@ -2,6 +2,7 @@ package pandaproxy
 
 import (
 	"context"
+	"github.com/goccy/go-json"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/united-manufacturing-hub/Sarama-Kafka-Wrapper/pkg/kafka"
 	"go.uber.org/zap"
@@ -62,8 +63,13 @@ func HTTPToKafkaMessage(message RecordEx) (messageK kafka.Message) {
 	if len(message.Key) > 0 {
 		messageK.Key = []byte(message.Key)
 	}
-	if len(message.Value) > 0 {
-		messageK.Value = []byte(message.Value)
+	if message.Value != nil {
+		bytes, err := json.Marshal(message.Value)
+		if err != nil {
+			zap.S().Errorf("Error marshalling message value: %v", err)
+		} else {
+			messageK.Value = bytes
+		}
 	}
 	messageK.Topic = message.Topic
 	return messageK

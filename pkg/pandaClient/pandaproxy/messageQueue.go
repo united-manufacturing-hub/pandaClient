@@ -60,7 +60,7 @@ func (h *HTTPMessageQueue) StartMessageSender() {
 					if len(messages) == 0 {
 						continue
 					}
-					_, errorBody, err := PostMessages(h.baseUrl, topic, Messages{Records: messages})
+					_, errorBody, err, sendMsg, sendBytes := PostMessages(h.baseUrl, topic, Messages{Records: messages})
 					if err != nil {
 						zap.S().Warnf("Error posting messages to topic %s: %v", topic, err)
 						continue
@@ -69,6 +69,8 @@ func (h *HTTPMessageQueue) StartMessageSender() {
 						zap.S().Warnf("Error posting messages to topic %s: %v", topic, errorBody)
 						continue
 					}
+					h.sentMessages.Add(uint64(sendMsg))
+					h.sentBytes.Add(uint64(sendBytes))
 				}
 				topicMessageMap = make(map[string][]Record)
 			}
@@ -206,9 +208,10 @@ func (h *HTTPMessageQueue) consume() {
 				Topic:     message.Topic,
 			})
 			h.receivedMessages.Add(1)
-			h.receivedBytes.Add(uint64(len(message.Value)))
+			msgX := HTTPToKafkaMessage(message)
+			h.receivedBytes.Add(uint64(len(msgX.Value)))
 			h.receivedBytes.Add(uint64(len(message.Key)))
-			h.incomingMessages <- HTTPToKafkaMessage(message)
+			h.incomingMessages <- msgX
 		}
 		var partitions = Partitions{
 			Partitions: partitionList,

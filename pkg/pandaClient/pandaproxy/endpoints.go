@@ -114,15 +114,15 @@ func PostSubscribeToTopic(baseUrl, groupName, instanceId string, topics Subscrib
 	return e, err
 }
 
-func PostMessages(baseUrl, topic string, messages Messages) (*MessageOffsets, *ErrorBody, error) {
+func PostMessages(baseUrl, topic string, messages Messages) (*MessageOffsets, *ErrorBody, error, int, int) {
 	msgBytes, err := json.Marshal(messages)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, err, 0, 0
 	}
 	// Create a reader from the bytes
 	msgReader := bytes.NewReader(msgBytes)
-
-	return PostT[MessageOffsets](baseUrl, fmt.Sprintf("/topics/%s", topic), msgReader, ContentTypeJSONJSON, false, nil)
+	t, e, err := PostT[MessageOffsets](baseUrl, fmt.Sprintf("/topics/%s", topic), msgReader, ContentTypeJSONJSON, false, nil)
+	return t, e, err, len(messages.Records), len(msgBytes)
 }
 
 func GetMessages(baseUrl, groupName, instanceId string) (*[]RecordEx, *ErrorBody, error) {

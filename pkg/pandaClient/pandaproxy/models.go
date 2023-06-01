@@ -53,11 +53,11 @@ type MessagesEx struct {
 }
 
 type RecordEx struct {
-	Topic     string `json:"topic"`
-	Key       string `json:"key"`
-	Value     string `json:"value"`
-	Partition int64  `json:"partition"`
-	Offset    int64  `json:"offset"`
+	Value     interface{} `json:"value"`
+	Topic     string      `json:"topic"`
+	Key       string      `json:"key"`
+	Partition int64       `json:"partition"`
+	Offset    int64       `json:"offset"`
 }
 type Partitions struct {
 	Partitions []Partition `json:"partitions"`
