@@ -125,3 +125,12 @@ func (p *PandaClient) Closed() bool {
 	}
 	return true
 }
+
+func (p *PandaClient) GetStats() (sent uint64, received uint64, sendBytesA uint64, receivedBytesA uint64) {
+	if p.canUseKafka {
+		return kafka.GetKafkaStats()
+	} else if p.canUseHTTP {
+		return p.httpMessageQueue.GetStats()
+	}
+	return 0, 0, 0, 0
+}

@@ -21,6 +21,10 @@ type HTTPMessageQueue struct {
 	baseUrl          string
 	groupName        string
 	closing          atomic.Bool
+	sentMessages     atomic.Uint64
+	receivedMessages atomic.Uint64
+	sentBytes        atomic.Uint64
+	receivedBytes    atomic.Uint64
 }
 
 func New(baseUrl string) HTTPMessageQueue {
@@ -59,9 +63,16 @@ func (h *HTTPMessageQueue) StartMessageSender() {
 					_, errorBody, err := PostMessages(h.baseUrl, topic, Messages{Records: messages})
 					if err != nil {
 						zap.S().Warnf("Error posting messages to topic %s: %v", topic, err)
+						continue
 					}
 					if errorBody != nil {
 						zap.S().Warnf("Error posting messages to topic %s: %v", topic, errorBody)
+						continue
+					}
+					h.sentMessages.Add(uint64(len(messages)))
+					for _, message := range messages {
+						h.sentBytes.Add(uint64(len(message.Value)))
+						h.sentBytes.Add(uint64(len(message.Key)))
 					}
 				}
 				topicMessageMap = make(map[string][]Record)
@@ -199,6 +210,9 @@ func (h *HTTPMessageQueue) consume() {
 				Offset:    message.Offset,
 				Topic:     message.Topic,
 			})
+			h.receivedMessages.Add(1)
+			h.receivedBytes.Add(uint64(len(message.Value)))
+			h.receivedBytes.Add(uint64(len(message.Key)))
 			h.incomingMessages <- HTTPToKafkaMessage(message)
 		}
 		var partitions = Partitions{
@@ -237,4 +251,8 @@ func (h *HTTPMessageQueue) Ready() bool {
 
 func (h *HTTPMessageQueue) Closed() bool {
 	return h.closing.Load()
+}
+
+func (h *HTTPMessageQueue) GetStats() (sent uint64, received uint64, sendBytesA uint64, receivedBytesA uint64) {
+	return h.sentMessages.Load(), h.receivedMessages.Load(), h.sentBytes.Load(), h.receivedBytes.Load()
 }
