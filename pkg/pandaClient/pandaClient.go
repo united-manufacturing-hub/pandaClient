@@ -11,11 +11,12 @@ type HTTPClientOptions struct {
 }
 
 type PandaClient struct {
-	httpOpts    *HTTPClientOptions
-	kafkaClient *kafka.Client
-	kafkaOpts   kafka.NewClientOptions
-	canUseKafka bool
-	canUseHTTP  bool
+	httpOpts         *HTTPClientOptions
+	kafkaClient      *kafka.Client
+	httpMessageQueue pandaproxy.HTTPMessageQueue
+	kafkaOpts        kafka.NewClientOptions
+	canUseKafka      bool
+	canUseHTTP       bool
 }
 
 func New(options kafka.NewClientOptions, httpOpts *HTTPClientOptions) *PandaClient {
@@ -58,12 +59,42 @@ func (p *PandaClient) Connect() (kafkaConnected, httpConnected bool, kafkaConnec
 			p.canUseHTTP = true
 		}
 	}
+	if p.canUseHTTP {
+		p.httpMessageQueue = pandaproxy.New(p.httpOpts.baseURL)
+		go p.httpMessageQueue.StartMessageSender()
+		err = p.httpMessageQueue.StartSubscriber(p.kafkaOpts)
+		if err != nil {
+			httpConnectError = err
+			p.canUseHTTP = false
+		}
+	}
 	return p.canUseKafka, p.canUseHTTP, kafkaConnectError, httpConnectError
 }
 
-func (p *PandaClient) Close() error {
+func (p *PandaClient) Close() (errK error, errH error) {
 	if p.kafkaClient != nil {
-		return p.kafkaClient.Close()
+		errK = p.kafkaClient.Close()
+	}
+	if p.canUseHTTP {
+		errH = p.httpMessageQueue.Close()
+	}
+	return errK, errH
+}
+
+func (p *PandaClient) EnqueueMessage(message kafka.Message) error {
+	if p.canUseKafka {
+		return p.kafkaClient.EnqueueMessage(message)
+	} else if p.canUseHTTP {
+		return p.httpMessageQueue.EnqueueMessage(message)
+	}
+	return fmt.Errorf("cannot enqueue message: no connection to kafka or http")
+}
+
+func (p *PandaClient) GetMessages() <-chan kafka.Message {
+	if p.canUseKafka {
+		return p.kafkaClient.GetMessages()
+	} else if p.canUseHTTP {
+		return p.httpMessageQueue.GetMessages()
 	}
 	return nil
 }

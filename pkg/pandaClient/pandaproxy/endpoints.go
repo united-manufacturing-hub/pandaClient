@@ -1,18 +1,23 @@
 package pandaproxy
 
 import (
-	"context"
+	"bytes"
+	"fmt"
 	"github.com/goccy/go-json"
 	"io"
 	"net/http"
-	"time"
 )
 
-func GetBrokers(baseUrl string) (*Brokers, *ErrorBody, error) {
-	response, err := DoRequest(http.MethodGet, baseUrl+"/brokers", nil)
+func DoT[T any](baseUrl, path string, body io.Reader, method string, ct contentType, noResponseExpected bool, acceptType *contentType) (*T, *ErrorBody, error) {
+	// prepend the path with a slash if it doesn't have one
+	if path[0] != '/' {
+		path = "/" + path
+	}
+	response, err := DoRequest(method, baseUrl+path, body, ct, acceptType)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer response.Body.Close()
 
 	var bodyBytes []byte
 	// read all response body bytes
@@ -21,38 +26,113 @@ func GetBrokers(baseUrl string) (*Brokers, *ErrorBody, error) {
 		return nil, nil, err
 	}
 
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		// Parse error body
 		var errorBody ErrorBody
 		err = json.Unmarshal(bodyBytes, &errorBody)
 		if err != nil {
 			return nil, nil, err
 		}
+		if errorBody.Code == 0 {
+			errorBody.Code = int64(response.StatusCode)
+		}
 		return nil, &errorBody, nil
 	}
-	var brokers Brokers
-	err = json.Unmarshal(bodyBytes, &brokers)
+
+	if noResponseExpected {
+		return nil, nil, nil
+	}
+
+	var responseJ T
+	err = json.Unmarshal(bodyBytes, &responseJ)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return &brokers, nil, nil
+	return &responseJ, nil, nil
 }
 
-func DoRequest(method, url string, body io.Reader) (*http.Response, error) {
-	ctx, cancle := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancle()
-	request, err := http.NewRequestWithContext(ctx, method, url, body)
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Set("Accept", "application/vnd.kafka.v2+json")
-	request.Header.Set("Content-Type", "application/vnd.kafka.v2+json")
+func GetT[T any](baseUrl, path string, body io.Reader, ct contentType, noResponseExpected bool, acceptType *contentType) (*T, *ErrorBody, error) {
+	return DoT[T](baseUrl, path, body, http.MethodGet, ct, noResponseExpected, acceptType)
+}
 
-	var response *http.Response
-	response, err = http.DefaultClient.Do(request)
+func PostT[T any](baseUrl, path string, body io.Reader, ct contentType, noResponseExpected bool, acceptType *contentType) (*T, *ErrorBody, error) {
+	return DoT[T](baseUrl, path, body, http.MethodPost, ct, noResponseExpected, acceptType)
+}
+
+func DeleteT[T any](baseUrl, path string, body io.Reader, ct contentType, noResponseExpected bool, acceptType *contentType) (*T, *ErrorBody, error) {
+	return DoT[T](baseUrl, path, body, http.MethodDelete, ct, noResponseExpected, acceptType)
+}
+
+func GetBrokers(baseUrl string) (*Brokers, *ErrorBody, error) {
+	return GetT[Brokers](baseUrl, "/brokers", nil, ContentTypeJSON, false, nil)
+}
+
+func GetTopics(baseUrl string) (*Topics, *ErrorBody, error) {
+	return GetT[Topics](baseUrl, "/topics", nil, ContentTypeJSON, false, nil)
+}
+
+func PostConsumerGroup(baseUrl, groupName, consumerName string) (*ConsumerGroupInstance, *ErrorBody, error) {
+	group := ConsumerGroup{
+		Format:                   "json",
+		Name:                     consumerName,
+		AutoOffsetReset:          "earliest",
+		AutoCommitEnable:         "false",
+		FetchMinBytes:            "1",
+		ConsumerRequestTimeoutMS: "30000",
+	}
+
+	groupBytes, err := json.Marshal(group)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Create a reader from the bytes
+	msgReader := bytes.NewReader(groupBytes)
+
+	return PostT[ConsumerGroupInstance](baseUrl, fmt.Sprintf("/consumers/%s", groupName), msgReader, ContentTypeJSON, false, nil)
+}
+
+func DeleteConsumerGroupInstance(baseUrl, groupName string, instanceId string) (*ErrorBody, error) {
+	_, e, err := DeleteT[any](baseUrl, fmt.Sprintf("/consumers/%s/instances/%s", groupName, instanceId), nil, ContentTypeJSON, true, nil)
+	return e, err
+}
+
+func PostSubscribeToTopic(baseUrl, groupName, instanceId string, topics SubscribeTopics) (*ErrorBody, error) {
+	topicBytes, err := json.Marshal(topics)
 	if err != nil {
 		return nil, err
 	}
-	return response, nil
+	// Create a reader from the bytes
+	msgReader := bytes.NewReader(topicBytes)
+
+	var e *ErrorBody
+	_, e, err = PostT[any](baseUrl, fmt.Sprintf("/consumers/%s/instances/%s/subscription", groupName, instanceId), msgReader, ContentTypeJSON, true, nil)
+	return e, err
+}
+
+func PostMessages(baseUrl, topic string, messages Messages) (*MessageOffsets, *ErrorBody, error) {
+	msgBytes, err := json.Marshal(messages)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Create a reader from the bytes
+	msgReader := bytes.NewReader(msgBytes)
+
+	return PostT[MessageOffsets](baseUrl, fmt.Sprintf("/topics/%s", topic), msgReader, ContentTypeJSONJSON, false, nil)
+}
+
+func GetMessages(baseUrl, groupName, instanceId string) (*[]RecordEx, *ErrorBody, error) {
+	var at = ContentTypeJSONJSON
+	return GetT[[]RecordEx](baseUrl, fmt.Sprintf("/consumers/%s/instances/%s/records", groupName, instanceId), nil, ContentTypeJSONJSON, false, &at)
+}
+
+func PostCommitOffsets(baseUrl, groupName, instanceId string, p Partitions) (interface{}, *ErrorBody, error) {
+	partitionsBytes, err := json.Marshal(p)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Create a reader from the bytes
+	msgReader := bytes.NewReader(partitionsBytes)
+
+	return PostT[any](baseUrl, fmt.Sprintf("/consumers/%s/instances/%s/offsets", groupName, instanceId), msgReader, ContentTypeJSON, false, nil)
 }
