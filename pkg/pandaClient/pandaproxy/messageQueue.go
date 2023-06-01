@@ -53,7 +53,7 @@ func (h *HTTPMessageQueue) StartMessageSender() {
 		case <-time.After(1 * time.Second):
 			{
 				for topic, messages := range topicMessageMap {
-					if messages == nil || len(messages) == 0 {
+					if len(messages) == 0 {
 						continue
 					}
 					_, errorBody, err := PostMessages(h.baseUrl, topic, Messages{Records: messages})
