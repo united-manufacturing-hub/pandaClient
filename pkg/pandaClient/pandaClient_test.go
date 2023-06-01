@@ -1,6 +1,7 @@
 package pandaClient
 
 import (
+	"github.com/goccy/go-json"
 	"github.com/united-manufacturing-hub/Sarama-Kafka-Wrapper/pkg/kafka"
 	"go.uber.org/zap"
 	"regexp"
@@ -133,9 +134,20 @@ func TestPandaClient_EnqueueMessageForceHTTP(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		err := client.EnqueueMessage(kafka.Message{
+		val := struct {
+			Test string `json:"test"`
+			Inc  int    `json:"inc"`
+		}{
+			Test: "value",
+			Inc:  i,
+		}
+		valBytes, err := json.Marshal(val)
+		if err != nil {
+			t.Fatalf("Failed to marshal json: %v", err)
+		}
+		err = client.EnqueueMessage(kafka.Message{
 			Topic: "test-topic",
-			Value: []byte("test-value"),
+			Value: valBytes,
 		})
 		if err != nil {
 			t.Fatalf("EnqueueMessage failed: %v", err)

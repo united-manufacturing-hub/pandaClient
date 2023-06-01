@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/goccy/go-json v0.10.2
+	github.com/json-iterator/go v1.1.12
 	github.com/united-manufacturing-hub/Sarama-Kafka-Wrapper v1.9.0
 	go.uber.org/zap v1.24.0
 )
@@ -23,7 +24,6 @@ require (
 	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

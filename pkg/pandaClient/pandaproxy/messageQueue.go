@@ -69,11 +69,6 @@ func (h *HTTPMessageQueue) StartMessageSender() {
 						zap.S().Warnf("Error posting messages to topic %s: %v", topic, errorBody)
 						continue
 					}
-					h.sentMessages.Add(uint64(len(messages)))
-					for _, message := range messages {
-						h.sentBytes.Add(uint64(len(message.Value)))
-						h.sentBytes.Add(uint64(len(message.Key)))
-					}
 				}
 				topicMessageMap = make(map[string][]Record)
 			}

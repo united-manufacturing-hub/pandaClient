@@ -2,6 +2,7 @@ package pandaproxy
 
 import (
 	"context"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/united-manufacturing-hub/Sarama-Kafka-Wrapper/pkg/kafka"
 	"go.uber.org/zap"
 	"io"
@@ -44,7 +45,14 @@ func KafkaToHTTPMessage(message kafka.Message) Record {
 		record.Key = string(message.Key)
 	}
 	if message.Value != nil && len(message.Value) > 0 {
-		record.Value = string(message.Value)
+		// try to Unmarshal as map[string]interface{}
+		var value map[string]interface{}
+		err := jsoniter.Unmarshal(message.Value, &value)
+		if err != nil {
+			record.Value = string(message.Value)
+		} else {
+			record.Value = value
+		}
 	}
 	record.Partition = 0
 	return record

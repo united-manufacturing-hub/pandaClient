@@ -20,9 +20,9 @@ type Messages struct {
 }
 
 type Record struct {
-	Key       string `json:"key"`
-	Value     string `json:"value"`
-	Partition int64  `json:"partition"`
+	Value     interface{} `json:"value"`
+	Key       string      `json:"key"`
+	Partition int64       `json:"partition"`
 }
 
 type MessageOffsets struct {
