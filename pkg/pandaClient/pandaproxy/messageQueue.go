@@ -185,10 +185,10 @@ func (h *HTTPMessageQueue) consume() {
 			continue
 		}
 
-		var paritionList = make([]Partition, 0, 1)
+		var partitionList = make([]Partition, 0, 1)
 
 		for _, message := range *messages {
-			paritionList = append(paritionList, Partition{
+			partitionList = append(partitionList, Partition{
 				Partition: message.Partition,
 				Offset:    message.Offset,
 				Topic:     message.Topic,
@@ -196,7 +196,7 @@ func (h *HTTPMessageQueue) consume() {
 			h.incomingMessages <- HTTPToKafkaMessage(message)
 		}
 		var partitions = Partitions{
-			Partitions: paritionList,
+			Partitions: partitionList,
 		}
 
 		if len(partitions.Partitions) == 0 {
