@@ -7,7 +7,7 @@ import (
 )
 
 type HTTPClientOptions struct {
-	baseURL string
+	BaseURL string
 }
 
 type PandaClient struct {
@@ -45,7 +45,7 @@ func (p *PandaClient) Connect() (kafkaConnected, httpConnected bool, kafkaConnec
 
 		var brokers *pandaproxy.Brokers
 		var errBody *pandaproxy.ErrorBody
-		brokers, errBody, err = pandaproxy.GetBrokers(p.httpOpts.baseURL)
+		brokers, errBody, err = pandaproxy.GetBrokers(p.httpOpts.BaseURL)
 		if err != nil {
 			httpConnectError = err
 			p.canUseHTTP = false
@@ -60,7 +60,7 @@ func (p *PandaClient) Connect() (kafkaConnected, httpConnected bool, kafkaConnec
 		}
 	}
 	if p.canUseHTTP {
-		p.httpMessageQueue = pandaproxy.New(p.httpOpts.baseURL)
+		p.httpMessageQueue = pandaproxy.New(p.httpOpts.BaseURL)
 		go p.httpMessageQueue.StartMessageSender()
 		err = p.httpMessageQueue.StartSubscriber(p.kafkaOpts)
 		if err != nil {

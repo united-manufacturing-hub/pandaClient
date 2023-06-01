@@ -34,7 +34,7 @@ func TestConnect(t *testing.T) {
 	}
 
 	httpOptions := &HTTPClientOptions{
-		baseURL: "https://kafka1.mgmt-test.umh.app",
+		BaseURL: "https://kafka1.mgmt-test.umh.app",
 	}
 
 	client := New(kafkaOptions, httpOptions)
@@ -67,7 +67,7 @@ func TestPandaClient_EnqueueMessage(t *testing.T) {
 	}
 
 	httpOptions := &HTTPClientOptions{
-		baseURL: "https://kafka1.mgmt-test.umh.app",
+		BaseURL: "https://kafka1.mgmt-test.umh.app",
 	}
 
 	client := New(kafkaOptions, httpOptions)
@@ -120,7 +120,7 @@ func TestPandaClient_EnqueueMessageForceHTTP(t *testing.T) {
 	}
 
 	httpOptions := &HTTPClientOptions{
-		baseURL: "https://kafka1.mgmt-test.umh.app",
+		BaseURL: "https://kafka1.mgmt-test.umh.app",
 	}
 
 	client := New(kafkaOptions, httpOptions)
