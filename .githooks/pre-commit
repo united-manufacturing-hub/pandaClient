@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Update Go dependencies
+echo "Updating Go dependencies..."
+go get -u ./...
+
+# Run go fmt
+echo "Running go fmt..."
+go fmt ./...
+
+# Check if fieldalignment is installed, if not, install it
+if ! command -v fieldalignment >/dev/null 2>&1; then
+  echo "fieldalignment not found, installing..."
+  go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
+fi
+
+# Run fieldalignment -fix if there are any errors
+echo "Running fieldalignment..."
+if ! fieldalignment ./...; then
+	echo "Running fieldalignment -fix until it exits normally..."
+	while ! fieldalignment -fix ./...; do
+	  echo "Retrying fieldalignment -fix..."
+	done
+	git add .
+fi
+
+# Check if go.mod and go.sum have changes after updating dependencies
+if ! git diff --quiet -- go.mod go.sum; then
+  echo "go.mod and/or go.sum have been updated. Adding changes to the commit..."
+  git add go.mod go.sum
+fi
+
+# Proceed with the commit
+echo "Proceeding with the commit..."
+

@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -eu
+
+cwd=$(pwd)
+
+# shellcheck disable=SC2046
+cd $(git rev-parse --show-toplevel) || exit 1
+
+go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
+
+fieldalignment ./...
+
+go install golang.org/x/vuln/cmd/govulncheck@latest
+govulncheck ./...
+
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+golangci-lint run ./...
+
+cd "$cwd" || exit 1
