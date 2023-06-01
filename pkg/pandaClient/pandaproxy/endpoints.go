@@ -14,20 +14,11 @@ func DoT[T any](baseUrl, path string, body io.Reader, method string, ct contentT
 	if path[0] != '/' {
 		path = "/" + path
 	}
-	response, err := DoRequest(method, baseUrl+path, body, ct, acceptType)
+	bodyBytes, statusCode, err := DoRequest(method, baseUrl+path, body, ct, acceptType)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer response.Body.Close()
-
-	var bodyBytes []byte
-	// read all response body bytes
-	bodyBytes, err = io.ReadAll(response.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
+	if statusCode < 200 || statusCode >= 300 {
 		// Parse error body
 		var errorBody ErrorBody
 		err = json.Unmarshal(bodyBytes, &errorBody)
@@ -35,7 +26,7 @@ func DoT[T any](baseUrl, path string, body io.Reader, method string, ct contentT
 			return nil, nil, err
 		}
 		if errorBody.Code == 0 {
-			errorBody.Code = int64(response.StatusCode)
+			errorBody.Code = int64(statusCode)
 		}
 		return nil, &errorBody, nil
 	}

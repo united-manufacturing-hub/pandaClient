@@ -18,13 +18,13 @@ const (
 	ContentTypeJSON     contentType = "application/vnd.kafka.v2+json"
 )
 
-func DoRequest(method, url string, body io.Reader, ct contentType, acceptType *contentType) (*http.Response, error) {
+func DoRequest(method, url string, body io.Reader, ct contentType, acceptType *contentType) ([]byte, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		zap.S().Errorf("Error creating request: %v", err)
-		return nil, err
+		return nil, 0, err
 	}
 	request.Header.Set("Content-Type", string(ct))
 	if acceptType != nil {
@@ -35,9 +35,18 @@ func DoRequest(method, url string, body io.Reader, ct contentType, acceptType *c
 	response, err = http.DefaultClient.Do(request)
 	if err != nil {
 		zap.S().Errorf("Error sending request: %v", err)
-		return nil, err
+		return nil, 0, err
 	}
-	return response, nil
+	defer response.Body.Close()
+
+	var bodyBytes []byte
+	// read all response body bytes
+	bodyBytes, err = io.ReadAll(response.Body)
+	if err != nil {
+		return nil, response.StatusCode, err
+	}
+
+	return bodyBytes, response.StatusCode, nil
 }
 
 func KafkaToHTTPMessage(message kafka.Message) Record {
