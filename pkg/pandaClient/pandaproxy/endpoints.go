@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/goccy/go-json"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 )
@@ -46,6 +47,9 @@ func DoT[T any](baseUrl, path string, body io.Reader, method string, ct contentT
 	var responseJ T
 	err = json.Unmarshal(bodyBytes, &responseJ)
 	if err != nil {
+		zap.S().Errorf("Error unmarshalling response: %v", err)
+		zap.S().Errorf("Response body: %s", string(bodyBytes))
+		zap.S().Errorf("T type: %T", responseJ)
 		return nil, nil, err
 	}
 
