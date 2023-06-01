@@ -116,3 +116,12 @@ func (p *PandaClient) Ready() bool {
 	}
 	return false
 }
+
+func (p *PandaClient) Closed() bool {
+	if p.canUseKafka {
+		return p.kafkaClient.Closed()
+	} else if p.canUseHTTP {
+		return p.httpMessageQueue.Closed()
+	}
+	return true
+}

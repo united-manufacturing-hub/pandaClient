@@ -227,3 +227,7 @@ func (h *HTTPMessageQueue) GetQueueLength() int {
 func (h *HTTPMessageQueue) Ready() bool {
 	return !h.closing.Load()
 }
+
+func (h *HTTPMessageQueue) Closed() bool {
+	return h.closing.Load()
+}
