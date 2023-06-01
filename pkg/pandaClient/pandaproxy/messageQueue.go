@@ -124,6 +124,7 @@ func (h *HTTPMessageQueue) StartSubscriber(opts kafka.NewClientOptions) error {
 }
 
 func (h *HTTPMessageQueue) topicRefresher(regex *regexp.Regexp) {
+	zap.S().Infof("Starting topic refresher")
 	var previousTopics []string
 	for !h.closing.Load() {
 		topics, e, err := GetTopics(h.baseUrl)
@@ -160,11 +161,14 @@ func (h *HTTPMessageQueue) topicRefresher(regex *regexp.Regexp) {
 		if topicErr != nil {
 			zap.S().Warnf("Error subscribing to topic (TE): %v", topicErr)
 		}
+		previousTopics = topicList
 		time.Sleep(5 * time.Second)
 	}
+	zap.S().Infof("Closing topic refresher")
 }
 
 func (h *HTTPMessageQueue) consume() {
+	zap.S().Infof("Starting consumer loop")
 	var messages *[]RecordEx
 	var bodyError *ErrorBody
 	var err error
@@ -218,6 +222,7 @@ func (h *HTTPMessageQueue) consume() {
 
 		time.Sleep(100 * time.Millisecond)
 	}
+	zap.S().Infof("Consumer loop closed")
 }
 
 func (h *HTTPMessageQueue) GetQueueLength() int {
