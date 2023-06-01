@@ -219,3 +219,11 @@ func (h *HTTPMessageQueue) consume() {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
+func (h *HTTPMessageQueue) GetQueueLength() int {
+	return len(h.messageQueue)
+}
+
+func (h *HTTPMessageQueue) Ready() bool {
+	return !h.closing.Load()
+}

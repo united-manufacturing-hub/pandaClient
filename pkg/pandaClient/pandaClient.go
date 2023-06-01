@@ -98,3 +98,21 @@ func (p *PandaClient) GetMessages() <-chan kafka.Message {
 	}
 	return nil
 }
+
+func (p *PandaClient) GetQueueLength() int {
+	if p.canUseKafka {
+		return p.kafkaClient.GetQueueLength()
+	} else if p.canUseHTTP {
+		return p.httpMessageQueue.GetQueueLength()
+	}
+	return 0
+}
+
+func (p *PandaClient) Ready() bool {
+	if p.canUseKafka {
+		return p.kafkaClient.Ready()
+	} else if p.canUseHTTP {
+		return p.httpMessageQueue.Ready()
+	}
+	return false
+}
