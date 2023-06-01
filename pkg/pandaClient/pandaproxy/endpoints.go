@@ -44,6 +44,10 @@ func DoT[T any](baseUrl, path string, body io.Reader, method string, ct contentT
 		return nil, nil, nil
 	}
 
+	if len(bodyBytes) == 0 {
+		return new(T), nil, nil
+	}
+
 	var responseJ T
 	err = json.Unmarshal(bodyBytes, &responseJ)
 	if err != nil {

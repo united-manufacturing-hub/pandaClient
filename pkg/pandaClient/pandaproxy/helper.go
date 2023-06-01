@@ -19,7 +19,7 @@ const (
 )
 
 func DoRequest(method, url string, body io.Reader, ct contentType, acceptType *contentType) (*http.Response, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
