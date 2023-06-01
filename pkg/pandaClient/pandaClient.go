@@ -62,7 +62,7 @@ func (p *PandaClient) Connect() (kafkaConnected, httpConnected bool, kafkaConnec
 	if p.canUseHTTP {
 		p.httpMessageQueue = pandaproxy.New(p.httpOpts.BaseURL)
 		go p.httpMessageQueue.StartMessageSender()
-		err = p.httpMessageQueue.StartSubscriber(p.kafkaOpts)
+		err = p.httpMessageQueue.StartSubscriber(fmt.Sprintf("%s-http", p.kafkaOpts.ClientID), fmt.Sprintf("%s-http", p.kafkaOpts.ConsumerName), p.kafkaOpts.ListenTopicRegex)
 		if err != nil {
 			httpConnectError = err
 			p.canUseHTTP = false

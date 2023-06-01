@@ -94,8 +94,8 @@ func (h *HTTPMessageQueue) GetMessages() <-chan kafka.Message {
 	return h.incomingMessages
 }
 
-func (h *HTTPMessageQueue) StartSubscriber(opts kafka.NewClientOptions) error {
-	instance, bodyError, err := PostConsumerGroup(h.baseUrl, opts.ConsumerName, opts.ClientID)
+func (h *HTTPMessageQueue) StartSubscriber(clientId, consumerName string, listenRegex *regexp.Regexp) error {
+	instance, bodyError, err := PostConsumerGroup(h.baseUrl, consumerName, clientId)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (h *HTTPMessageQueue) StartSubscriber(opts kafka.NewClientOptions) error {
 	// If bodyError is 409, we need to delete the instance and try again
 	if bodyError != nil && bodyError.Code == 409 {
 		zap.S().Debugf("Consumer group already exists, deleting and recreating")
-		bodyError, err = DeleteConsumerGroupInstance(h.baseUrl, opts.ConsumerName, opts.ClientID)
+		bodyError, err = DeleteConsumerGroupInstance(h.baseUrl, consumerName, clientId)
 		if err != nil {
 			return err
 		}
@@ -115,7 +115,7 @@ func (h *HTTPMessageQueue) StartSubscriber(opts kafka.NewClientOptions) error {
 		}
 		zap.S().Debugf("Deleted consumer group, recreating")
 
-		instance, bodyError, err = PostConsumerGroup(h.baseUrl, opts.ConsumerName, opts.ClientID)
+		instance, bodyError, err = PostConsumerGroup(h.baseUrl, consumerName, clientId)
 		if err != nil {
 			return err
 		}
@@ -123,12 +123,12 @@ func (h *HTTPMessageQueue) StartSubscriber(opts kafka.NewClientOptions) error {
 			return fmt.Errorf("error creating consumer group: %v", bodyError)
 		}
 	}
-	zap.S().Debugf("Created consumer group (%s) instance: %+v", opts.ConsumerName, instance)
+	zap.S().Debugf("Created consumer group (%s) instance: %+v", consumerName, instance)
 
-	h.groupName = opts.ConsumerName
+	h.groupName = consumerName
 	h.groupInstance = instance
 
-	go h.topicRefresher(opts.ListenTopicRegex)
+	go h.topicRefresher(listenRegex)
 	go h.consume()
 
 	return nil
