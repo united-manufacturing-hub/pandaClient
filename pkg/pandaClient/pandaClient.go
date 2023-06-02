@@ -71,6 +71,7 @@ func (p *PandaClient) Connect() (kafkaConnected, httpConnected bool, kafkaConnec
 			p.canUseHTTP = false
 		}
 	}
+	go p.readMessages()
 	return p.canUseKafka, p.canUseHTTP, kafkaConnectError, httpConnectError
 }
 
