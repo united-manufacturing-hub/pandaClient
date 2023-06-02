@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/united-manufacturing-hub/Sarama-Kafka-Wrapper/pkg/kafka"
 	"github.com/united-manufacturing-hub/pandaClient/pkg/pandaClient/pandaproxy"
+	"time"
 )
 
 type HTTPClientOptions struct {
@@ -13,16 +14,18 @@ type HTTPClientOptions struct {
 type PandaClient struct {
 	httpOpts         *HTTPClientOptions
 	kafkaClient      *kafka.Client
-	httpMessageQueue pandaproxy.HTTPMessageQueue
+	incomingMessages chan kafka.Message
 	kafkaOpts        kafka.NewClientOptions
+	httpMessageQueue pandaproxy.HTTPMessageQueue
 	canUseKafka      bool
 	canUseHTTP       bool
 }
 
 func New(options kafka.NewClientOptions, httpOpts *HTTPClientOptions) *PandaClient {
 	return &PandaClient{
-		kafkaOpts: options,
-		httpOpts:  httpOpts,
+		kafkaOpts:        options,
+		httpOpts:         httpOpts,
+		incomingMessages: make(chan kafka.Message, 1000),
 	}
 }
 
@@ -91,12 +94,41 @@ func (p *PandaClient) EnqueueMessage(message kafka.Message) error {
 }
 
 func (p *PandaClient) GetMessages() <-chan kafka.Message {
-	if p.canUseKafka {
-		return p.kafkaClient.GetMessages()
-	} else if p.canUseHTTP {
-		return p.httpMessageQueue.GetMessages()
+	return p.incomingMessages
+}
+
+func (p *PandaClient) readMessages() {
+	for !p.Closed() {
+		if len(p.incomingMessages) >= cap(p.incomingMessages) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		if p.canUseKafka {
+			var chanX = p.kafkaClient.GetMessages()
+			if chanX == nil {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			select {
+			case message := <-chanX:
+				p.incomingMessages <- message
+			case <-time.After(100 * time.Millisecond):
+				continue
+			}
+		} else if p.canUseHTTP {
+			var chanX = p.httpMessageQueue.GetMessages()
+			if chanX == nil {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			select {
+			case message := <-chanX:
+				p.incomingMessages <- message
+			case <-time.After(100 * time.Millisecond):
+				continue
+			}
+		}
 	}
-	return nil
 }
 
 func (p *PandaClient) GetQueueLength() int {
