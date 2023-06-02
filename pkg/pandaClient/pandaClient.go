@@ -104,6 +104,9 @@ func (p *PandaClient) Reconnect() {
 	}
 
 	p.canUseHTTP.Store(false)
+	if p.httpOpts == nil {
+		return
+	}
 	p.httpMessageQueue = pandaproxy.New(p.httpOpts.BaseURL)
 	go p.httpMessageQueue.StartMessageSender()
 	err = p.httpMessageQueue.StartSubscriber(fmt.Sprintf("%s-http", p.kafkaOpts.ClientID), fmt.Sprintf("%s-http", p.kafkaOpts.ConsumerName), p.kafkaOpts.ListenTopicRegex)

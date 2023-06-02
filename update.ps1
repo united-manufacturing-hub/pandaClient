@@ -16,6 +16,12 @@ if ($initialHash -eq $updatedHash) {
     exit
 }
 
+# Check if the "vendor" directory exists
+if (Test-Path -Path ".\vendor") {
+    # If it does, run "go mod vendor"
+    go mod vendor
+}
+
 # If there are changes, add all files in the repo
 git add .
 
