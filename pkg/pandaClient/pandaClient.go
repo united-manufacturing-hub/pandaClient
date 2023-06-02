@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/united-manufacturing-hub/Sarama-Kafka-Wrapper/pkg/kafka"
 	"github.com/united-manufacturing-hub/pandaClient/pkg/pandaClient/pandaproxy"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -152,8 +153,10 @@ func (p *PandaClient) Ready() bool {
 
 func (p *PandaClient) Closed() bool {
 	if p.canUseKafka {
+		zap.S().Debugf("kafkaClient.Closed() = %v", p.kafkaClient.Closed())
 		return p.kafkaClient.Closed()
 	} else if p.canUseHTTP {
+		zap.S().Debugf("httpMessageQueue.Closed() = %v", p.httpMessageQueue.Closed())
 		return p.httpMessageQueue.Closed()
 	}
 	return true
