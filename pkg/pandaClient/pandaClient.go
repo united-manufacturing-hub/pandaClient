@@ -198,7 +198,6 @@ func (p *PandaClient) Ready() bool {
 
 func (p *PandaClient) Closed() bool {
 	if p.canUseKafka.Load() {
-		zap.S().Debugf("kafkaClient.Closed() = %v", p.kafkaClient.Closed())
 		return p.kafkaClient.Closed()
 	} else if p.canUseHTTP.Load() {
 		zap.S().Debugf("httpMessageQueue.Closed() = %v", p.httpMessageQueue.Closed())
