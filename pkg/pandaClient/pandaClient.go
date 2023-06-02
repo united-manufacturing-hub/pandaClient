@@ -79,10 +79,11 @@ func (p *PandaClient) Connect() (kafkaConnected, httpConnected bool, kafkaConnec
 
 func (p *PandaClient) Reconnect() {
 	var err error
+	p.canUseKafka.Store(false)
+	p.canUseHTTP.Store(false)
 
 	// Re-open Kafka connection
-	if p.canUseKafka.Load() {
-		p.canUseKafka.Store(false)
+	if p.canUseKafka.Load() && p.kafkaClient != nil {
 		err = p.kafkaClient.Close()
 		zap.S().Infof("Kafka connection closed: %v", err)
 		time.Sleep(5 * time.Second)
@@ -103,7 +104,6 @@ func (p *PandaClient) Reconnect() {
 		time.Sleep(5 * time.Second)
 	}
 
-	p.canUseHTTP.Store(false)
 	if p.httpOpts == nil {
 		return
 	}
@@ -185,6 +185,9 @@ func (p *PandaClient) GetQueueLength() int {
 }
 
 func (p *PandaClient) Ready() bool {
+	if !p.canUseKafka.Load() && !p.canUseHTTP.Load() {
+		return false
+	}
 	if p.canUseKafka.Load() {
 		return p.kafkaClient.Ready()
 	} else if p.canUseHTTP.Load() {
