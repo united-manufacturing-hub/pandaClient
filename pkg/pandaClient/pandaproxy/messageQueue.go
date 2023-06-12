@@ -183,12 +183,12 @@ func (h *HTTPMessageQueue) consume() {
 	for !h.closing.Load() {
 		messages, bodyError, err = GetMessages(h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 		if err != nil {
-			zap.S().Debugf("Error getting messages: %v", err)
+			zap.S().Debugf("Error getting messages: %v for (%s,%s,%s)", err, h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 		if bodyError != nil {
-			zap.S().Debugf("Error getting messages: %#v", bodyError)
+			zap.S().Debugf("Error getting messages: %#v for (%s,%s,%s)", bodyError, h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 			time.Sleep(1 * time.Second)
 			continue
 		}
