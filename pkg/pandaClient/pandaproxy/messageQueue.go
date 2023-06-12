@@ -9,33 +9,54 @@ import (
 	"time"
 )
 
+//goland:noinspection GoUnitSpecificDurationSuffix
+const (
+	FiveSeconds            = 5 * time.Second
+	OneHundredMilliseconds = 100 * time.Millisecond
+	QueueSize              = 1000
+)
+
 type MessageTopic struct {
 	Topic   string
 	Message Record
 }
 
 type HTTPMessageQueue struct {
-	messageQueue     chan MessageTopic
-	incomingMessages chan kafka.Message
-	groupInstance    *ConsumerGroupInstance
-	baseUrl          string
-	groupName        string
-	closing          atomic.Bool
-	sentMessages     atomic.Uint64
-	receivedMessages atomic.Uint64
-	sentBytes        atomic.Uint64
-	receivedBytes    atomic.Uint64
+	messageQueue           chan MessageTopic
+	incomingMessages       chan kafka.Message
+	groupInstance          *ConsumerGroupInstance
+	baseUrl                string
+	groupName              string
+	sentMessages           atomic.Uint64
+	receivedMessages       atomic.Uint64
+	sentBytes              atomic.Uint64
+	receivedBytes          atomic.Uint64
+	messageQueueClosed     atomic.Bool
+	incomingMessagesClosed atomic.Bool
+	closing                atomic.Bool
 }
 
 func New(baseUrl string) HTTPMessageQueue {
 	return HTTPMessageQueue{
-		messageQueue:     make(chan MessageTopic, 1000),
-		baseUrl:          baseUrl,
-		incomingMessages: make(chan kafka.Message, 1000),
+		messageQueue:           make(chan MessageTopic, QueueSize),
+		incomingMessages:       make(chan kafka.Message, QueueSize),
+		messageQueueClosed:     atomic.Bool{},
+		incomingMessagesClosed: atomic.Bool{},
+		groupInstance:          nil,
+		baseUrl:                baseUrl,
+		groupName:              "",
+		closing:                atomic.Bool{},
+		sentMessages:           atomic.Uint64{},
+		receivedMessages:       atomic.Uint64{},
+		sentBytes:              atomic.Uint64{},
+		receivedBytes:          atomic.Uint64{},
 	}
 }
 
 func (h *HTTPMessageQueue) EnqueueMessage(message kafka.Message) error {
+	if h.messageQueueClosed.Load() {
+		return fmt.Errorf("message queue is closed")
+	}
 	h.messageQueue <- MessageTopic{
 		Message: KafkaToHTTPMessage(message),
 		Topic:   message.Topic,
@@ -45,7 +66,8 @@ func (h *HTTPMessageQueue) EnqueueMessage(message kafka.Message) error {
 
 func (h *HTTPMessageQueue) StartMessageSender() {
 	var topicMessageMap = make(map[string][]Record)
-	for !h.closing.Load() {
+	var topicFailureMap = make(map[string]uint64)
+	for !h.closing.Load() && !h.messageQueueClosed.Load() {
 		select {
 		case messageTopic := <-h.messageQueue:
 			{
@@ -62,11 +84,16 @@ func (h *HTTPMessageQueue) StartMessageSender() {
 					}
 					_, errorBody, err, sendMsg, sendBytes := PostMessages(h.baseUrl, topic, Messages{Records: messages})
 					if err != nil {
-						zap.S().Warnf("Error posting messages to topic %s: %v", topic, err)
+						if _, ok := topicFailureMap[topic]; !ok {
+							topicFailureMap[topic] = 0
+						}
+						topicFailureMap[topic]++
+
+						zap.S().Warnf("Error posting messages to topic %s: %v (%d failures for this Topic)", topic, err, topicFailureMap[topic])
 						continue
 					}
 					if errorBody != nil {
-						zap.S().Warnf("Error posting messages to topic %s: %v", topic, errorBody)
+						zap.S().Warnf("Error posting messages to topic %s: %v (%d failures for this Topic)", topic, errorBody, topicFailureMap[topic])
 						continue
 					}
 					h.sentMessages.Add(uint64(sendMsg))
@@ -80,14 +107,21 @@ func (h *HTTPMessageQueue) StartMessageSender() {
 
 func (h *HTTPMessageQueue) Close() error {
 	h.closing.Store(true)
-	if h.groupInstance != nil {
-		_, err := DeleteConsumerGroupInstance(h.baseUrl, h.groupName, h.groupInstance.InstanceID)
-		return err
+	if h.groupInstance == nil {
+		return fmt.Errorf("group instance is nil")
 	}
-	return nil
+	_, err := DeleteConsumerGroupInstance(h.baseUrl, h.groupName, h.groupInstance.InstanceID)
+	h.messageQueueClosed.Store(true)
+	close(h.messageQueue)
+	h.incomingMessagesClosed.Store(true)
+	close(h.incomingMessages)
+	return err
 }
 
 func (h *HTTPMessageQueue) GetMessages() <-chan kafka.Message {
+	if h.incomingMessagesClosed.Load() {
+		return nil
+	}
 	return h.incomingMessages
 }
 
@@ -134,10 +168,16 @@ func (h *HTTPMessageQueue) StartSubscriber(clientId, consumerName string, listen
 func (h *HTTPMessageQueue) topicRefresher(regex *regexp.Regexp) {
 	zap.S().Infof("Starting topic refresher")
 	var previousTopics []string
-	for !h.closing.Load() {
+	ticker := time.NewTicker(FiveSeconds)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if h.closing.Load() {
+			zap.S().Infof("Closing topic refresher")
+			return
+		}
 		topics, e, err := GetTopics(h.baseUrl)
 		if err != nil || e != nil {
-			time.Sleep(1 * time.Second)
 			continue
 		}
 		var topicList []string
@@ -154,7 +194,6 @@ func (h *HTTPMessageQueue) topicRefresher(regex *regexp.Regexp) {
 			}
 		}
 		if len(newTopics) == 0 {
-			time.Sleep(10 * time.Second)
 			continue
 		}
 		zap.S().Infof("Subscribing to new topics: %+v", newTopics)
@@ -162,6 +201,11 @@ func (h *HTTPMessageQueue) topicRefresher(regex *regexp.Regexp) {
 		var subtopics = SubscribeTopics{
 			Topics: newTopics,
 		}
+		if h.groupInstance == nil {
+			zap.S().Debugf("group instance is nil")
+			continue
+		}
+
 		topicErr, err := PostSubscribeToTopic(h.baseUrl, h.groupName, h.groupInstance.InstanceID, subtopics)
 		if err != nil {
 			zap.S().Warnf("Error subscribing to topic: %v", err)
@@ -170,8 +214,8 @@ func (h *HTTPMessageQueue) topicRefresher(regex *regexp.Regexp) {
 			zap.S().Warnf("Error subscribing to topic (TE): %v", topicErr)
 		}
 		previousTopics = topicList
-		time.Sleep(5 * time.Second)
 	}
+
 	zap.S().Infof("Closing topic refresher")
 }
 
@@ -180,25 +224,28 @@ func (h *HTTPMessageQueue) consume() {
 	var messages *[]RecordEx
 	var bodyError *ErrorBody
 	var err error
-	for !h.closing.Load() {
+	ticker := time.NewTicker(OneHundredMilliseconds)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if h.closing.Load() {
+			zap.S().Infof("Closing consumer loop")
+			return
+		}
 		if h.baseUrl == "" || h.groupName == "" || h.groupInstance == nil {
 			zap.S().Debugf("Not consuming, missing baseUrl, groupName or groupInstance: %s, %s, %+v", h.baseUrl, h.groupName, h.groupInstance)
-			time.Sleep(1 * time.Second)
 			continue
 		}
 		messages, bodyError, err = GetMessages(h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 		if err != nil {
 			zap.S().Debugf("Error getting messages: %v for (%s,%s,%s)", err, h.baseUrl, h.groupName, h.groupInstance.InstanceID)
-			time.Sleep(1 * time.Second)
 			continue
 		}
 		if bodyError != nil {
 			zap.S().Debugf("Error getting messages: %#v for (%s,%s,%s)", bodyError, h.baseUrl, h.groupName, h.groupInstance.InstanceID)
-			time.Sleep(1 * time.Second)
 			continue
 		}
 		if messages == nil {
-			time.Sleep(1 * time.Second)
 			continue
 		}
 
@@ -213,38 +260,49 @@ func (h *HTTPMessageQueue) consume() {
 				Topic:     message.Topic,
 			})
 			h.receivedMessages.Add(1)
-			msgX := HTTPToKafkaMessage(message)
+			var msgX kafka.Message
+			msgX, err = HTTPToKafkaMessage(message)
+			if err != nil {
+				zap.S().Debugf("Error converting message: %v", err)
+				continue
+			}
 			h.receivedBytes.Add(uint64(len(msgX.Value)))
 			h.receivedBytes.Add(uint64(len(message.Key)))
-			h.incomingMessages <- msgX
+			if !h.incomingMessagesClosed.Load() || h.incomingMessages != nil {
+				h.incomingMessages <- msgX
+			}
 		}
 		var partitions = Partitions{
 			Partitions: partitionList,
 		}
 
 		if len(partitions.Partitions) == 0 {
-			time.Sleep(1 * time.Second)
 			continue
 		}
-
+		if h.groupInstance == nil {
+			zap.S().Debugf("group instance is nil")
+			continue
+		}
 		_, bodyError, err = PostCommitOffsets(h.baseUrl, h.groupName, h.groupInstance.InstanceID, partitions)
 		if err != nil {
 			zap.S().Debugf("Error committing offsets: %v", err)
-			time.Sleep(1 * time.Second)
 			continue
 		}
 		if bodyError != nil {
 			zap.S().Debugf("Error committing offsets: %v", bodyError)
-			time.Sleep(1 * time.Second)
 			continue
 		}
-
-		time.Sleep(100 * time.Millisecond)
 	}
 	zap.S().Infof("Consumer loop closed")
 }
 
 func (h *HTTPMessageQueue) GetQueueLength() int {
+	if h.messageQueue == nil {
+		return 0
+	}
+	if h.messageQueueClosed.Load() {
+		return 0
+	}
 	return len(h.messageQueue)
 }
 
