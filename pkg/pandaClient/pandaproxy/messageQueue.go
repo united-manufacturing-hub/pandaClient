@@ -181,6 +181,11 @@ func (h *HTTPMessageQueue) consume() {
 	var bodyError *ErrorBody
 	var err error
 	for !h.closing.Load() {
+		if h.baseUrl == "" || h.groupName == "" || h.groupInstance == nil {
+			zap.S().Debugf("Not consuming, missing baseUrl, groupName or groupInstance: %s, %s, %+v", h.baseUrl, h.groupName, h.groupInstance)
+			time.Sleep(1 * time.Second)
+			continue
+		}
 		messages, bodyError, err = GetMessages(h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 		if err != nil {
 			zap.S().Debugf("Error getting messages: %v for (%s,%s,%s)", err, h.baseUrl, h.groupName, h.groupInstance.InstanceID)
