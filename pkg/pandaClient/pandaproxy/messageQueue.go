@@ -5,6 +5,7 @@ import (
 	"github.com/united-manufacturing-hub/Sarama-Kafka-Wrapper/pkg/kafka"
 	"go.uber.org/zap"
 	"regexp"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -239,11 +240,21 @@ func (h *HTTPMessageQueue) consume() {
 		}
 		messages, bodyError, err = GetMessages(h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 		if err != nil {
+			// Ignore offset_out_of_range errors
+			if strings.Contains(err.Error(), "offset_out_of_range") {
+				continue
+			}
+
 			zap.S().Debugf("Error getting messages: %v for (%s,%s,%s)", err, h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 			time.Sleep(OneSecond)
 			continue
 		}
 		if bodyError != nil {
+			// Ignore offset_out_of_range errors
+			if strings.Contains(bodyError.Message, "offset_out_of_range") {
+				continue
+			}
+
 			zap.S().Debugf("Error getting messages: %#v for (%s,%s,%s)", bodyError, h.baseUrl, h.groupName, h.groupInstance.InstanceID)
 			time.Sleep(OneSecond)
 			continue
