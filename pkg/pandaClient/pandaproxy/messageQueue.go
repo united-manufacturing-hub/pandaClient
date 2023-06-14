@@ -249,7 +249,9 @@ func (h *HTTPMessageQueue) consume() {
 			continue
 		}
 
-		zap.S().Debugf("Got %d messages", len(*messages))
+		if len(*messages) > 0 {
+			zap.S().Debugf("Got %d messages", len(*messages))
+		}
 
 		var partitionList = make([]Partition, 0, 1)
 
