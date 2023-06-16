@@ -155,7 +155,7 @@ func (p *PandaClient) readMessages() {
 			}
 			select {
 			case message := <-chanX:
-				zap.S().Debugf("Got message from Kafka: %v", message.Topic)
+				//zap.S().Debugf("Got message from Kafka: %v", message.Topic)
 				p.incomingMessages <- message
 			case <-time.After(100 * time.Millisecond):
 				continue
@@ -168,7 +168,7 @@ func (p *PandaClient) readMessages() {
 			}
 			select {
 			case message := <-chanX:
-				zap.S().Debugf("Got message from HTTP: %v", message.Topic)
+				//zap.S().Debugf("Got message from HTTP: %v", message.Topic)
 				p.incomingMessages <- message
 			case <-time.After(100 * time.Millisecond):
 				continue
