@@ -67,7 +67,7 @@ func (p *PandaClient) Connect() (kafkaConnected, httpConnected bool, kafkaConnec
 	if p.canUseHTTP.Load() {
 		p.httpMessageQueue = pandaproxy.New(p.httpOpts.BaseURL)
 		go p.httpMessageQueue.StartMessageSender()
-		err = p.httpMessageQueue.StartSubscriber(fmt.Sprintf("%s-http", p.kafkaOpts.ClientID), fmt.Sprintf("%s-http", p.kafkaOpts.ConsumerName), p.kafkaOpts.ListenTopicRegex)
+		err = p.httpMessageQueue.StartSubscriber(fmt.Sprintf("%s-http", p.kafkaOpts.ClientID), fmt.Sprintf("%s-http", p.kafkaOpts.ConsumerGroupId), p.kafkaOpts.ListenTopicRegex)
 		if err != nil {
 			httpConnectError = err
 			p.canUseHTTP.Store(false)
@@ -109,7 +109,7 @@ func (p *PandaClient) Reconnect() {
 	}
 	p.httpMessageQueue = pandaproxy.New(p.httpOpts.BaseURL)
 	go p.httpMessageQueue.StartMessageSender()
-	err = p.httpMessageQueue.StartSubscriber(fmt.Sprintf("%s-http", p.kafkaOpts.ClientID), fmt.Sprintf("%s-http", p.kafkaOpts.ConsumerName), p.kafkaOpts.ListenTopicRegex)
+	err = p.httpMessageQueue.StartSubscriber(fmt.Sprintf("%s-http", p.kafkaOpts.ClientID), fmt.Sprintf("%s-http", p.kafkaOpts.ConsumerGroupId), p.kafkaOpts.ListenTopicRegex)
 	if err != nil {
 		zap.S().Errorf("HTTP connection failed: %v", err)
 		p.canUseHTTP.Store(false)
