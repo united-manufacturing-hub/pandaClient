@@ -21,7 +21,7 @@ func TestConnect(t *testing.T) {
 		SenderTag: kafka.SenderTag{
 			Enabled: false,
 		},
-		ConsumerName:            "test-consumer",
+		ConsumerGroupId:         "test-consumer",
 		TransactionalID:         "test-transactional-id",
 		ClientID:                "test-client-id",
 		Brokers:                 []string{"kafka1.mgmt-test.umh.app:31092"},
@@ -55,7 +55,7 @@ func TestPandaClient_EnqueueMessage(t *testing.T) {
 		SenderTag: kafka.SenderTag{
 			Enabled: false,
 		},
-		ConsumerName:            "test-consumer",
+		ConsumerGroupId:         "test-consumer",
 		ClientID:                "test-client-id",
 		Brokers:                 []string{"kafka1.mgmt-test.umh.app:31092"},
 		StartOffset:             0,
@@ -108,7 +108,7 @@ func TestPandaClient_EnqueueMessageForceHTTP(t *testing.T) {
 		SenderTag: kafka.SenderTag{
 			Enabled: false,
 		},
-		ConsumerName:            "test-consumer",
+		ConsumerGroupId:         "test-consumer",
 		ClientID:                "test-client-id",
 		Brokers:                 []string{"kafka1.mgmt-test.umh.app:0"},
 		StartOffset:             0,
